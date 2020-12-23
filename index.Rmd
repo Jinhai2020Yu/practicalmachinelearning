@@ -1,0 +1,72 @@
+---
+title: "Prediction"
+author: "Jinhai_Yu"
+date: "12/21/2020"
+output: html_document
+---
+## Summary
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+In this project, I use the data of 6 participants, and perform 3 different model fit, including classification trees, random forest, and generalized boost. Among them, random forest gives the highest prediction accuracy, which might due to overfitting, which needs further test to validate. At last, use random forest model to predict the 20 test cases.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries, load data
+```{r load library, message=FALSE}
+library(caret)
+library(ggplot2)
+library(dplyr)
+library(randomForest)
+library(rattle)
+test <- read.csv("testing.csv")
+training <- read.csv("training.csv")
+dim(test); dim(training); str(training)
+```
+## Remove variables containing large amount of NA or non-necessary information
+```{r subset data}
+## remove variables containing NA
+toremove <- which(colSums(is.na(training) | training == "") > 0.9 * dim(training)[1])
+length(toremove)
+training_subset <- training[, -toremove]
+test <- test[, -toremove]
+## remove object information
+training_subset <- training_subset[, -c(1:7)]
+test <- test[, -c(1:7)]
+dim(test); dim(training_subset)
+## subset part of training data as validation data
+set.seed(1221)
+inTrain <- createDataPartition(training_subset$class, p = 0.7, list = FALSE)
+train <- training_subset[inTrain, ]
+test1 <- training_subset[-inTrain, ]
+str(train); str(test)
+```
+## Build Fit Models
+### 1.Classification Trees; 2. Random Forest; 3. Genenralized Boost
+```{r models, cache=TRUE}
+# Classification Trees
+modfit1 <- train(classe ~ ., data = train, method = "rpart")
+fancyRpartPlot(modfit1$finalModel)
+pred1 <- predict(modfit1, newdata = test1)
+confusionMatrix(pred1, as.factor(test1$classe))$overall[1]
+# Random Forest
+RFcontrol <- trainControl(method = "cv", number = 5, repeats = 3)
+modfit2 <- train(classe ~ ., data = train, method = "rf", trControl = RFcontrol)
+modfit2$finalModel
+pred2 <- predict(modfit2, newdata = test1)
+confusionMatrix(pred2, as.factor(test1$classe))$overall[1]
+# Generalized Boost
+modfit3 <- train(classe ~ ., data = train, method = "gbm", trControl = RFcontrol)
+modfit3
+pred3 <- predict(modfit3, newdata = test1)
+confusionMatrix(pred3, as.factor(test1$classe))$overall[1]
+```
+## Model selection
+Based on the results, "Random Forest" gives the highest accuracy: 0.9929, while "rpart" only has
+0.4933, and "gbm" results with 0.9631. We will choose modfit2 to predict test data.
+
+## Predict test data
+```{r predict}
+pred4 <- predict(modfit2, newdata = test)
+pred4
+```
